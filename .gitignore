@@ -1,0 +1,10 @@
+# Environments
+.env
+venv/
+
+# specific files
+.files/
+__pycache__/
+.ipynb_checkpoints/
+.backend/chroma_db2/
+.backend/data_images/

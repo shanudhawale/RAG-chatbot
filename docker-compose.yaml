@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  chainlit-rag:
+    image: pdf-rag:v1
+    container_name: chainlit-rag
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LLAMA_CLOUD_API_KEY: ${LLAMA_CLOUD_API_KEY}
+      DOCLING_ARTIFACTS_PATH: /root/.cache/docling/models
+    volumes:
+      - ${PROJECT_PATH}/backend/chroma_db2/:/app/backend/chroma_db2/
+      - ${PROJECT_PATH}/backend/data_images/:/app/backend/data_images/
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    runtime: nvidia
