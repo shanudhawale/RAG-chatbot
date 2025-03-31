@@ -7,6 +7,7 @@ A sophisticated PDF chatbot leveraging Retrieval-Augmented Generation (RAG) with
 - **Advanced RAG Implementation**: Custom multimodal RAG system using LlamaIndex + Docling + Instructor Embeddings + ChromaDB + GPT-4o + LLM evaluation + Guardrails via Custom Prompt
 - **PDF Processing**: Intelligent handling of PDFs including text and images
 - **Text Document Processing**: Handling .docx documents to markdowns
+- **XLSX Document Processing**: Handling .xlsx documents to markdowns
 - **Interactive Chat Interface**: User-friendly Chainlit interface with streaming responses
 - **Source Attribution**: tracking of source documents and page numbers
 - **Visual Context**: Dynamic display of relevant images from PDFs
@@ -21,7 +22,7 @@ The system implements a RAG architecture with the following components:
 
 1. **Document Processing**
    - Processes PDFs to extract both text as markdowns using Docling for .pdf, .docx and .xlsx dcouments
-   - Processes documents to extract images using docling's default OCR Easy-OCR
+   - Processes documents to extract images using Docling's default OCR Easy-OCR
    - Maintains spatial relationships and document structure
    - Creates separate nodes for text and image content and create a metadata rich document for pdf
 
@@ -32,6 +33,7 @@ The system implements a RAG architecture with the following components:
 
 3. **Vector Storage**
    - ChromaDB as the vector store and the indexes are created using the Instructor Embeddings
+   - SummaryIndex for xlsx documents and the indexes are created
    - Persistent storage for document embeddings
    - Efficient similarity search capabilities
 
@@ -76,7 +78,7 @@ The `MultiModalConversationalEngine` is a custom implementation that handles com
 - FastAPI for API endpoints
 - LlamaIndex for RAG implementation
 - ChromaDB for vector storage + Instructor-base Embeddings 
-- LLM evaluation using LlamaIndex 
+- LLM evaluation using LlamaIndex using RelevancyEvaluator, FaithfulnessEvaluator
 
 ### Frontend Components
 - Chainlit for interactive interface
@@ -129,7 +131,7 @@ docker build -t pdf-rag:v1 .
 
 - Run the Dockerfile
 ```bash
-docker run --gpus all --name shanu-rag -p 8000:8000 -p 8001:8001 -e OPENAI_API_KEY=<your_api_key_here > -e LLAMA_CLOUD_API_KEY=<your_api_key_here > -e DOCLING_ARTIFACTS_PATH=/root/.cache/docling/models -v "$(pwd)/backend/chroma_db2/:/app/backend/chroma_db2/" -v "$(pwd)/backend/data_images/:/app/backend/data_images/" pdf-rag:v1
+docker run --gpus all --name chainlit-rag -p 8000:8000 -p 8001:8001 -e OPENAI_API_KEY=<your_api_key_here > -e LLAMA_CLOUD_API_KEY=<your_api_key_here > -e DOCLING_ARTIFACTS_PATH=/root/.cache/docling/models -v "$(pwd)/backend/chroma_db2/:/app/backend/chroma_db2/" -v "$(pwd)/backend/data_images/:/app/backend/data_images/" pdf-rag:v1
 ```
 
 - You can also run the Docker-compose file:
