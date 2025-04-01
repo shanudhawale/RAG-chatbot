@@ -1,5 +1,6 @@
 import logging
 from fastapi import FastAPI, HTTPException, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from llama_index.core import StorageContext, VectorStoreIndex, ServiceContext
@@ -602,55 +603,62 @@ def get_base64_image(image_path: str) -> str:
 
 @app.post("/query")
 async def query_documents(request: QueryRequest):
-    global doc_type
-    try:
-        # inputfiles = [Path(ip[0]) for ip in request.input_files]
-        print("inputfiles:",request.input_files, request.collection)
+    async def event_stream():
+        global doc_type
+        try:
+            # inputfiles = [Path(ip[0]) for ip in request.input_files]
+            print("inputfiles:",request.input_files, request.collection)
 
-        if request.input_files != []:
-            docs, doc_type = process_documents(request.input_files, request.collection)
-            # print("<<<<<<<<<", docs, doc_type)
-        else:
-            docs = []
-        
-        current_index = initialize_index(request.collection,docs, doc_type)
-        if current_index is None:
-            raise HTTPException(
-                status_code=400,
-                detail="No indexed documents found. Please index documents first."
+            yield "event: status\ndata: Processing documents...\n\n"
+            if request.input_files != []:
+                docs, doc_type = process_documents(request.input_files, request.collection)
+                # print("<<<<<<<<<", docs, doc_type)
+            else:
+                docs = []
+            
+            yield "event: status\ndata:  Initializing index...\n\n"
+            current_index = initialize_index(request.collection,docs, doc_type)
+            if current_index is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No indexed documents found. Please index documents first."
+                )
+            
+            # Initialize multimodal LLM
+            
+            yield "event: status\ndata: Processing documents using GPT-4o...\n\n"
+            gpt_4v = OpenAIMultiModal(
+                model="gpt-4o",
+                api_key=os.getenv("OPENAI_API_KEY"),
+                max_new_tokens=4096
             )
-        
-        # Initialize multimodal LLM
-        gpt_4v = OpenAIMultiModal(
-            model="gpt-4o",
-            api_key=os.getenv("OPENAI_API_KEY"),
-            max_new_tokens=4096
-        )
-        
-        # Initialize memory buffer
-        memory_key = f"memory_{request.user_id}"
-        if memory_key not in chat_history:
-            chat_history[memory_key] = ChatMemoryBuffer.from_defaults()
-        
-        # Create custom query engine
-        query_engine = MultiModalConversationalEngine()
-        query_engine.intialize_engine(
-            retriever=current_index.as_retriever(similarity_top_k=3),
-            multi_modal_llm=gpt_4v,
-            memory_buffer=chat_history[memory_key]
-        )
-        
-        # Get response
-        response = query_engine.custom_query(request.query)
-        
-        return {
-            "response": str(response),
-            "source_nodes": response.source_nodes
-        }
+            
+            # Initialize memory buffer
+            memory_key = f"memory_{request.user_id}"
+            if memory_key not in chat_history:
+                chat_history[memory_key] = ChatMemoryBuffer.from_defaults()
+            
+            # Create custom query engine
+            query_engine = MultiModalConversationalEngine()
+            query_engine.intialize_engine(
+                retriever=current_index.as_retriever(similarity_top_k=3),
+                multi_modal_llm=gpt_4v,
+                memory_buffer=chat_history[memory_key]
+            )
+            
+            # Get response
+            response = query_engine.custom_query(request.query)
+            yield "event: status\ndata: Response received from GPT-4o...\n\n"
+            final_result={
+                "response": str(response),
+                "source_nodes": response.source_nodes
+            }
+            yield f"event: final\ndata: {json.dumps(final_result)}\n\n"
+        except Exception as e:
+            logger.error(f"Error processing query: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
     
-    except Exception as e:
-        logger.error(f"Error processing query: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 @app.get("/chat_history/{user_id}")
 async def get_chat_history(user_id: str):
