@@ -35,15 +35,14 @@ async def process_query(query: str, user_id: str, input_files: list , collection
                 "collection": collection_user,
             }) as response:
                 response.raise_for_status()
-
                 async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        data = line[6:]
                     if line.startswith("event: final"):
-                        return json.loads(data)
-                    else:
-                        yield data
-                        
+                        data = line.replace("event: final\ndata: ", "").strip()
+                        yield {"type": "final", "data": json.loads(data)}
+                    elif line.startswith("data:"):
+                        msg = line.replace("data: ", "").strip()
+                        yield {"type": "update", "data": msg}
+
     except httpx.RequestError as e:
         raise Exception(f"Error communicating with API: {str(e)}")
 
