@@ -10,6 +10,7 @@ import asyncio
 import uuid
 import os
 from pathlib import Path
+import httpx
 # from appv4 import initialize_index, process_documents
 
 logging.basicConfig(level=logging.INFO)
@@ -25,16 +26,27 @@ async def process_docs():
 async def process_query(query: str, user_id: str, input_files: list , collection_user:str):
     """Send query to FastAPI backend and process response"""
     try:
-        response = requests.post(
-            f"{API_BASE_URL}/query",
-            json={
-                "query": query + ''.join(str(x[-1]) for x in input_files),
-                "data_path": "data",
-                "user_id": user_id,
-                "input_files":input_files,
-                "collection":collection_user,
-            }
-        )
+        async with httpx.AsyncClient(timeout=180.0) as client:
+            response = await client.post(
+                f"{API_BASE_URL}/query",
+                json={
+                    "query": query + ''.join(str(x[-1]) for x in input_files),
+                    "data_path": "data",
+                    "user_id": user_id,
+                    "input_files": input_files,
+                    "collection": collection_user,
+                }
+            )
+        # response = requests.post(
+        #     f"{API_BASE_URL}/query",
+        #     json={
+        #         "query": query + ''.join(str(x[-1]) for x in input_files),
+        #         "data_path": "data",
+        #         "user_id": user_id,
+        #         "input_files":input_files,
+        #         "collection":collection_user,
+        #     }
+        # )
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
