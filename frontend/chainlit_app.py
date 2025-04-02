@@ -41,6 +41,9 @@ async def process_query(query: str, user_id: str, input_files: list , collection
 
     except httpx.RequestError as e:
         raise Exception(f"Error communicating with API: {str(e)}")
+    
+    finally:
+        await response.aclose()
 
 @cl.on_chat_start
 async def start():
@@ -104,7 +107,7 @@ async def main(message: cl.Message):
             elif update["type"] == "final":
                 response_data = update["data"]
                 response_dict = response_data["response"]
-                # print("response_dict", response_dict)
+                print("response_dict", response_dict)
                 elements = []
                 total_text = []
                 if "source_nodes" in response_data:
@@ -130,13 +133,6 @@ async def main(message: cl.Message):
                     actions=[cl.Action(name="show_source",
                                         payload={"source_id": source_id, "text": total_text},
                                         label="Click to view source")]
-        
-                # token_list = "Processing Completed. "
-                # for token in token_list.split(' '):
-                #     current_chunk = token + " "
-                #     await asyncio.sleep(0.15)
-                #     await msg1.stream_token(current_chunk)
-                # await msg1.send()
 
                 await cl.Message(
                     content=response_dict,
@@ -149,6 +145,8 @@ async def main(message: cl.Message):
             content=f"Error: {str(e)}",
             type="error"
         ).send()
+    
+    
 
 @cl.action_callback("show_source")
 async def on_action(action):
