@@ -47,7 +47,7 @@ The system implements a RAG architecture with the following components:
    - The documents retrieved and the final response provided by the LLM is evaluated using LlamaIndex's FaithfulnessEvaluator to check if the LLM didn't hallucinate and provided answers around the documents retrived from VectorIndex.
    - The score is being passed basis the evaluation with 1 being the highest and 5 being the lowest
    - Integrating LlamaIndex with MLFlow for tracing the experiments to gather insights on latency metrics under the project-name: 
-   *llama-index-pdf-qa-rag*
+   *llama-index-pdf-qa-rag* under the traces tab
 
 ### Multimodal Conversational Query Engine
 
