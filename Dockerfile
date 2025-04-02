@@ -29,8 +29,8 @@ RUN pip3 install --no-cache-dir -r requirements-new.txt
 
 RUN pip3 install sentence-transformers==2.2.2 
 RUN pip install "numpy<2.0"
-RUN pip install docling tiktoken
 
+RUN pip install docling tiktoken httpx
 RUN docling-tools models download
 ENV OMP_NUM_THREADS=4
 
