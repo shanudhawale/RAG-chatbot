@@ -39,9 +39,6 @@ async def process_query(query: str, user_id: str, input_files: list , collection
                         msg = line.replace("data: ", "").strip()
                         yield {"type": "update", "data": msg}
 
-    except httpx.RequestError as e:
-        raise Exception(f"Error communicating with API: {str(e)}")
-    
     finally:
         await response.aclose()
 
@@ -107,7 +104,7 @@ async def main(message: cl.Message):
             elif update["type"] == "final":
                 response_data = update["data"]
                 response_dict = response_data["response"]
-                print("response_dict", response_dict)
+                print("<<<<<>>>>>>response_dict", response_dict)
                 elements = []
                 total_text = []
                 if "source_nodes" in response_data:
