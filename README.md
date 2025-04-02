@@ -151,6 +151,21 @@ docker-compose down
 docker-compose logs -f chainlit-rag
 ```
 
+6. Install ngrok in the Linux/Ubuntu system
+
+```bash
+curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+  && echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+  | sudo tee /etc/apt/sources.list.d/ngrok.list \
+  && sudo apt update \
+  && sudo apt install ngrok
+```
+7. Login into ngrok website and create a auth token to be used internally on ec2 instance
+
+```bash
+ngrok config add-authtoken <token>
+```
 8. Reverse Proxy using ngrok with static domain:
 
 ```bash
