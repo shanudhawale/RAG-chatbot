@@ -97,7 +97,7 @@ async def main(message: cl.Message):
         source_id = ""
         # response_data = await process_query(message.content, user_id, input_files, folder_name)
         #print("response_data", response_data['source_nodes'])
-        async for update in process_query(...):
+        async for update in process_query(message.content, user_id, input_files, folder_name):
             if update["type"] == "update":
                 # msg1.stream_token(update["data"] + " ")
                 await cl.Message(content=update["data"]).send()
