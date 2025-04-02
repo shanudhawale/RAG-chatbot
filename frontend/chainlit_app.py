@@ -32,13 +32,22 @@ async def process_query(query: str, user_id: str, input_files: list , collection
             }) as response:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
-                    if line.startswith("event: final"):
-                        data = line.replace("event: final\ndata: ", "").strip()
-                        yield {"type": "final", "data": json.loads(data)}
-                    elif line.startswith("data:"):
-                        msg = line.replace("data: ", "").strip()
-                        yield {"type": "update", "data": msg}
-
+                    if not line.strip():
+                        continue
+                    if line.startswith("data:"):
+                        payload = line.replace("data:", "", 1).strip()
+                        
+                        if payload.startswith("{"):
+                            try:
+                                parsed = json.loads(payload)
+                                yield {"type": "final", "data": parsed}
+                            except json.JSONDecodeError as e:
+                                print("JSON decode failed:", e)
+                                print("Line was:", repr(payload))
+                                yield {"type": "error", "data": "Failed to parse JSON"}
+                        else:
+                            # Streaming status text or logs
+                            yield {"type": "update", "data": payload}
     finally:
         await response.aclose()
 
@@ -49,7 +58,7 @@ async def start():
     current_chunk = ""
     msg =cl.Message(content="")
     token_list = "Welcome! I'm ready to answer questions about your documents. Please upload your documents before asking questions. " \
-    "You can add one or more than one documents for your use case."
+    "You can add one or more than one documents for your use case. This chatbot accepts pdf, docx and xlsx documents"
 
     for token in token_list.split(' '):
         current_chunk = token + " "
@@ -95,47 +104,51 @@ async def main(message: cl.Message):
     
     try:
         source_id = ""
+        count= 0
         # response_data = await process_query(message.content, user_id, input_files, folder_name)
         #print("response_data", response_data['source_nodes'])
         async for update in process_query(message.content, user_id, input_files, folder_name):
-            if update["type"] == "update":
-                # msg1.stream_token(update["data"] + " ")
-                await cl.Message(content=update["data"]).send()
+            if update["type"] == "update" and count == 0:
+                message = cl.Message(content=update["data"])
+                count += 1
+                await asyncio.sleep(1)
+                await message.send()
+            elif update["type"] == "update" and count > 0:
+                message.content = update["data"]
+                await asyncio.sleep(1)
+                await message.update()
             elif update["type"] == "final":
+                # print("after process query:",update["data"])
                 response_data = update["data"]
                 response_dict = response_data["response"]
-                print("<<<<<>>>>>>response_dict", response_dict)
+                # print("<<<<<>>>>>>response_dict", response_dict, response_data["source_nodes"])
                 elements = []
                 total_text = []
                 if "source_nodes" in response_data:
                     for idx, node in enumerate(response_data["source_nodes"]):
                
-                        pdf_name = node['metadata'].get('pdf_name', 'Unknown')
+                        # pdf_name = node['metadata'].get('pdf_name', 'Unknown')
                         page_num = node['metadata'].get('page_num', 'Unknown')
                         actual_doc_name = node['metadata'].get('actual_doc_name', 'Unknown')
                         document_type = node['metadata'].get('document_type', 'Unknown')
                         source_id = f"Source: {actual_doc_name}, Page: {page_num} , Document Type: {document_type}"
                         # print("/////",pdf_name, page_num, source_id)
                         total_text.append(node['text'])
-                        if "image_base64" in node:
-                            elements.append(
-                            cl.Image(
-                                name=f"source_image_{len(elements)}",
-                                display="inline",
-                                content=base64.b64decode(node["image_base64"]),
-                                caption=f"Source: {node['metadata']['actual_doc_name']}, Page: {node['metadata']['page_num']}"
-                            ))
+                        if "image_base64" in node['metadata']:
+                            elements.append(cl.Image(name=f"source_image_{len(elements)}",
+                                                    display="inline",
+                                                    content=base64.b64decode(node['metadata']["image_base64"]),
+                                                    caption=f"Source: {node['metadata']['actual_doc_name']}, Page: {node['metadata']['page_num']}"))
 
                 if source_id != " ":
                     actions=[cl.Action(name="show_source",
                                         payload={"source_id": source_id, "text": total_text},
                                         label="Click to view source")]
-
-                await cl.Message(
-                    content=response_dict,
-                    elements=elements,
-                    actions=actions
-                ).send()
+                
+                message.content = response_dict
+                message.elements = elements
+                message.actions = actions
+                await message.update()
 
     except Exception as e:
         await cl.Message(
@@ -149,7 +162,6 @@ async def main(message: cl.Message):
 async def on_action(action):
     """Handle clicks to show source content"""
     try:
-        # Extract values from the action value
         source_id = action.payload.get("source_id", "Unknown Source")
         text = action.payload.get("text", "No content available")
         

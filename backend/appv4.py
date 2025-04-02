@@ -26,7 +26,7 @@ from llama_index.core.embeddings import BaseEmbedding
 import base64
 import shutil
 from llama_index.core import Document
-from llama_index.core.memory import ChatMemoryBuffer
+from llama_index.core.memory import ChatMemoryBuffer , ChatSummaryMemoryBuffer
 import json
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
@@ -35,6 +35,7 @@ from docling.pipeline.simple_pipeline import SimplePipeline
 from docling.pipeline.standard_pdf_pipeline import StandardPdfPipeline
 from docling.utils.export import generate_multimodal_pages
 from llama_index.core import SummaryIndex
+import tiktoken
 from llama_index.core.evaluation import FaithfulnessEvaluator
 from llama_index.core.evaluation import RelevancyEvaluator
 import nest_asyncio
@@ -51,8 +52,12 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="RAG API")
 
 load_dotenv()
-llm = OpenAI(model="gpt-4-turbo-preview", api_key=os.getenv("OPENAI_API_KEY"))
+llm = OpenAI(model="gpt-4-0125-preview", api_key=os.getenv("OPENAI_API_KEY"))
 Settings.llm = llm
+
+# Summarizer chat history
+summarizer_llm = llm
+tokenizer_fn = tiktoken.encoding_for_model("gpt-4-0125-preview").encode
 
 # Evaluation
 relavancy_evaluator = RelevancyEvaluator(llm=llm)
@@ -76,7 +81,8 @@ class ChatMessage(BaseModel):
 
 # Initialize global variables
 index_cache: Dict[str, VectorStoreIndex] = {}
-chat_history: Dict[str, List[ChatMessage]] = {}
+# chat_history: Dict[str, List[ChatMessage]] = {}
+chat_history: Dict[str, ChatSummaryMemoryBuffer] = {}
 
 
 pdf_pipeline_options = PdfPipelineOptions()
@@ -108,7 +114,7 @@ class InstructorEmbeddings(BaseEmbedding):
     def __init__(
         self,
         instructor_model_name: str = "hkunlp/instructor-base",
-        instruction: str = "Represent a document with Titles, Paragraphs, and Images for semantic search as it can contain diagrams and tables for reasearh and retrieval purposes:",
+        instruction: str = "Represent this document for semantic search across academic, report, and structured data formats around page numbers. If the content is from a research paper or presentation (PDF), focus on extracting key technical concepts, arguments, and any referenced figures or slides. If the content is from a DOCX file, capture the logical flow, section headings, and paragraph summaries relevant for understanding the main points and conclusions.",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -247,7 +253,7 @@ def process_documents(input_paths, output_dir):
                 with page_image_filename.open("wb") as fp:
                     page.image.save(fp, format="JPEG")
                 # print("saved image", page_no)
-                document = Document(text = content_md, metadata = {"document_type": "pdf",
+                document = Document(text = f"page number:{page_no}\n"+content_md, metadata = {"document_type": "pdf",
                                                                    "pdf_name": res.input.file.name,
                                                                    "actual_doc_name": actual_filenames[temp_file_names.index(f'{res.input.file.name}')],
                                                                    "page_num": page.page_no + 1,
@@ -320,12 +326,15 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         self,
         retriever,
         multi_modal_llm: OpenAIMultiModal,
-        memory_buffer: ChatMemoryBuffer = None,
+        memory_buffer: ChatSummaryMemoryBuffer = None,
         context_prompt: PromptTemplate = CONTEXT_PROMPT,
     ):
         self._retriever = retriever
         self._llm = multi_modal_llm
-        self._memory = memory_buffer or ChatMemoryBuffer.from_defaults(token_limit=2)
+        self._memory = memory_buffer or ChatSummaryMemoryBuffer.from_defaults(chat_history=chat_history,
+                                                                                llm=summarizer_llm,
+                                                                                token_limit=2,
+                                                                                tokenizer_fn=tokenizer_fn,)
         self._context_prompt = context_prompt
 
 
@@ -415,7 +424,7 @@ class MultiModalConversationalEngine(CustomQueryEngine):
                     "refrence": processed_response["refrence"],
                     "source_links": source_links
                 }
-                print(">>>>>>>Processed REsponse???????????", processed_response)
+                # print(">>>>>>>Processed REsponse???????????", processed_response)
                 return processed_response
             
             return response_data
@@ -441,17 +450,18 @@ class MultiModalConversationalEngine(CustomQueryEngine):
                 
         # run_tree.post()
         # Get chat history
-        chat_history = self._memory.get()
-        # chat_history_str = "\n".join([
-        #     f"{msg.role}: {msg.content}"
-        #     for msg in chat_history
-        # ])
-        chat_history_str_content = "\n".join([
+        try:
+            chat_history = self._memory.get()
+            chat_history_str_content = "\n".join([
             f"{msg.role}:{msg.content}"
             for msg in chat_history
-        ])
+            ])
         
-        # print("Chat History:", chat_history_str_content)
+            print("Chat History:", chat_history_str_content)
+        except Exception as e:
+            chat_history_str_content = ''
+            print("Error at chat chistory:", e)
+        
         # Get relevant documents
         retrieved_nodes = self._retriever.retrieve(query_str)
         print("@#######@",retrieved_nodes)
@@ -485,7 +495,7 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         context_text = "\n\n".join(context_chunks)
         # child_history_retriveal_run.end(outputs=context_chunks)
         # child_history_retriveal_run.patch()
-        # print("Context Text:",context_text)
+        print("Context Text:",context_text)
         #chat_history = self._memory.get()
         #print("!@#!!", chat_history)
         #chat_history_str = "\n".join([
@@ -493,13 +503,14 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         #    for msg in chat_history
         #])
         
+
         # Format prompt with context and history
         prompt = self._context_prompt.format(
             chat_history=chat_history_str_content,
             context_str=context_text,
             query_str=query_str
         )
-        
+        print("Final Prompt:", prompt)
         # Collect all image paths
         all_image_paths = []
         for node in image_nodes:
@@ -536,14 +547,14 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         processed_response = self.process_response(final_response)
         final_response_str = str(processed_response["result_response"]["explanation"])
 
-        eval_result = faithfull_evaluator.evaluate(response=final_response_str,
-                                                   contexts=context_chunks)
-        print("Faithfull eval result:",eval_result.passing, eval_result.score)
+        # eval_result = faithfull_evaluator.evaluate(response=final_response_str,
+        #                                            contexts=context_chunks)
+        # print("Faithfull eval result:",eval_result.passing, eval_result.score)
 
-        relevance_result = relavancy_evaluator.evaluate(query=query_str,
-                                                        response=final_response_str,
-                                                        contexts=context_chunks)
-        print("Relevance Result:",relevance_result.passing, relevance_result.score)
+        # relevance_result = relavancy_evaluator.evaluate(query=query_str,
+        #                                                 response=final_response_str,
+        #                                                 contexts=context_chunks)
+        # print("Relevance Result:",relevance_result.passing, relevance_result.score)
 
 
         # print("Final response before sending:", final_response_str)
@@ -561,7 +572,7 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         self._memory.put(ChatMessage(role="assistant",content=f"{final_response_str}", timestamp=datetime.now()))
 
         if document_type == []:
-            return Response("Can you be specific to which document are you referring to", source_nodes=[])
+            return Response("Can you ask a specific question to which document are you referring to", source_nodes=[])
         
         # Process source nodes and include base64 images
         seen_nodes = set()
@@ -636,38 +647,39 @@ async def query_documents(request: QueryRequest):
             # Initialize memory buffer
             memory_key = f"memory_{request.user_id}"
             if memory_key not in chat_history:
-                chat_history[memory_key] = ChatMemoryBuffer.from_defaults()
+                chat_history[memory_key] = ChatSummaryMemoryBuffer.from_defaults(llm=summarizer_llm,
+                                                                                token_limit=2,
+                                                                                tokenizer_fn=tokenizer_fn,)
             
             # Create custom query engine
             query_engine = MultiModalConversationalEngine()
             query_engine.intialize_engine(
-                retriever=current_index.as_retriever(similarity_top_k=3),
+                retriever=current_index.as_retriever(similarity_top_k=6),
                 multi_modal_llm=gpt_4v,
                 memory_buffer=chat_history[memory_key]
             )
             
             # Get response
             response = query_engine.custom_query(request.query)
-            print("############>>>>@@@@@@@@", response)
             yield "event: status\ndata: Response received from GPT-4o...\n\n"
-            
             final_result = {
                 "response": str(response),
                 "source_nodes": [
                     {
-                        "text": node.get("text"),
+                        "text": node["text"],
                         "metadata": {
-                            "pdf_name": node.metadata.get("pdf_name", "Unknown"),
-                            "page_num": node.metadata.get("page_num", "Unknown"),
-                            "actual_doc_name": node.metadata.get("actual_doc_name", "Unknown"),
-                            "document_type": node.metadata.get("document_type", "Unknown"),
-                            "image_base64": node.metadata.get("image_base64")
+                            "pdf_name": node["metadata"].get("pdf_name", "Unknown"),
+                            "page_num": node["metadata"].get("page_num", "Unknown"),
+                            "actual_doc_name": node["metadata"].get("actual_doc_name", "Unknown"),
+                            "document_type": node["metadata"].get("document_type", "Unknown"),
+                            "image_base64": node.get("image_base64", None)
                         }
                     }
                     for node in response.source_nodes
                 ]
             }
-            yield f"event: final\ndata: {json.dumps(final_result)}\n\n"
+
+            yield f"event: final\ndata: {json.dumps(final_result, separators=(',', ':'))}\n\n"
         except Exception as e:
             logger.error(f"Error processing query: {e}")
             raise HTTPException(status_code=500, detail=str(e))

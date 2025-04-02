@@ -1,8 +1,9 @@
 # Welcome to Multi-Modal Conversational RAG Document Assistant! 👋
 
-This is a document assistant that can help you query and analyze your documents on financial statements and presentation from Conoco Phillips.
+This is a document assistant that can help you query and analyze your documents 
 
 ## Features
+- Upload your documents, this chatbot accepts pdf, docx and xlsx documents
 - Ask questions about your documents
 - View source images and text
 - Get detailed responses with context
