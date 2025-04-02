@@ -648,13 +648,14 @@ async def query_documents(request: QueryRequest):
             
             # Get response
             response = query_engine.custom_query(request.query)
+            print("############>>>>@@@@@@@@", response)
             yield "event: status\ndata: Response received from GPT-4o...\n\n"
             
             final_result = {
                 "response": str(response),
                 "source_nodes": [
                     {
-                        "text": node.text,
+                        "text": node.get("text"),
                         "metadata": {
                             "pdf_name": node.metadata.get("pdf_name", "Unknown"),
                             "page_num": node.metadata.get("page_num", "Unknown"),
