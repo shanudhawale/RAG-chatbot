@@ -18,10 +18,6 @@ logger = logging.getLogger(__name__)
 
 # API endpoint
 API_BASE_URL = "http://127.0.0.1:8001"
-
-async def process_docs():
-    
-    return None
         
 async def process_query(query: str, user_id: str, input_files: list , collection_user:str):
     """Send query to FastAPI backend and process response"""
@@ -99,48 +95,54 @@ async def main(message: cl.Message):
     
     try:
         source_id = ""
-        response_data = await process_query(message.content, user_id, input_files, folder_name)
+        # response_data = await process_query(message.content, user_id, input_files, folder_name)
         #print("response_data", response_data['source_nodes'])
-        response_dict = response_data["response"]
-        # print("response_dict", response_dict)
-        elements = []
-        total_text = []
-        if "source_nodes" in response_data:
-            for idx, node in enumerate(response_data["source_nodes"]):
+        async for update in process_query(...):
+            if update["type"] == "update":
+                # msg1.stream_token(update["data"] + " ")
+                await cl.Message(content=update["data"]).send()
+            elif update["type"] == "final":
+                response_data = update["data"]
+                response_dict = response_data["response"]
+                # print("response_dict", response_dict)
+                elements = []
+                total_text = []
+                if "source_nodes" in response_data:
+                    for idx, node in enumerate(response_data["source_nodes"]):
                
-                pdf_name = node['metadata'].get('pdf_name', 'Unknown')
-                page_num = node['metadata'].get('page_num', 'Unknown')
-                actual_doc_name = node['metadata'].get('actual_doc_name', 'Unknown')
-                document_type = node['metadata'].get('document_type', 'Unknown')
-                source_id = f"Source: {actual_doc_name}, Page: {page_num} , Document Type: {document_type}"
-                # print("/////",pdf_name, page_num, source_id)
-                total_text.append(node['text'])
-                if "image_base64" in node:
-                    elements.append(
-                        cl.Image(
-                            name=f"source_image_{len(elements)}",
-                            display="inline",
-                            content=base64.b64decode(node["image_base64"]),
-                            caption=f"Source: {node['metadata']['actual_doc_name']}, Page: {node['metadata']['page_num']}"
-                        ))
+                        pdf_name = node['metadata'].get('pdf_name', 'Unknown')
+                        page_num = node['metadata'].get('page_num', 'Unknown')
+                        actual_doc_name = node['metadata'].get('actual_doc_name', 'Unknown')
+                        document_type = node['metadata'].get('document_type', 'Unknown')
+                        source_id = f"Source: {actual_doc_name}, Page: {page_num} , Document Type: {document_type}"
+                        # print("/////",pdf_name, page_num, source_id)
+                        total_text.append(node['text'])
+                        if "image_base64" in node:
+                            elements.append(
+                            cl.Image(
+                                name=f"source_image_{len(elements)}",
+                                display="inline",
+                                content=base64.b64decode(node["image_base64"]),
+                                caption=f"Source: {node['metadata']['actual_doc_name']}, Page: {node['metadata']['page_num']}"
+                            ))
 
-        if source_id != " ":
-            actions=[cl.Action(name="show_source",
-                                payload={"source_id": source_id, "text": total_text},
-                                label="Click to view source")]
+                if source_id != " ":
+                    actions=[cl.Action(name="show_source",
+                                        payload={"source_id": source_id, "text": total_text},
+                                        label="Click to view source")]
         
-        token_list = "Processing Completed. "
-        for token in token_list.split(' '):
-            current_chunk = token + " "
-            await asyncio.sleep(0.15)
-            await msg1.stream_token(current_chunk)
-        await msg1.send()
+                # token_list = "Processing Completed. "
+                # for token in token_list.split(' '):
+                #     current_chunk = token + " "
+                #     await asyncio.sleep(0.15)
+                #     await msg1.stream_token(current_chunk)
+                # await msg1.send()
 
-        await cl.Message(
-            content=response_dict,
-            elements=elements,
-            actions=actions
-        ).send()
+                await cl.Message(
+                    content=response_dict,
+                    elements=elements,
+                    actions=actions
+                ).send()
 
     except Exception as e:
         await cl.Message(
