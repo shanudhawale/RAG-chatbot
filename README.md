@@ -38,14 +38,16 @@ The system implements a RAG architecture with the following components:
    - Efficient similarity search capabilities
 
 4. **Retrieval System**
-   - Top-k similarity search for relevant content using ChromaDB indexes
+   - Top-k (here k=6) similarity search for relevant content using ChromaDB indexes
    - Hybrid retrieval combining text and image nodes
    - Context-aware document fetching and passing the context to the LLM for response generation strict to JSON included in the QA Custom Prompt
 
 5. **LLM Evaluation**
-   - Documents retrieved from the user query is evaluated using RelevancyEvaluator with callback of passing and score
+   - Documents retrieved from the user query is evaluated using LlamaIndex's RelevancyEvaluator with callback of passing and score
+   - The documents retrieved and the final response provided by the LLM is evaluated using LlamaIndex's FaithfulnessEvaluator to check if the LLM didn't hallucinate and provided answers around the documents retrived from VectorIndex.
    - The score is being passed basis the evaluation with 1 being the highest and 5 being the lowest
-   - The documents retrieved and the final response provided by the LLM is evaluated using FaithfulnessEvaluator to check if the LLM didn't hallucinate and provided answers around the documents retrived from VectorIndex.
+   - Integrating LlamaIndex with MLFlow for tracing the experiments to gather insights on latency metrics under the project-name: 
+   *llama-index-pdf-qa-rag*
 
 ### Multimodal Conversational Query Engine
 
@@ -84,6 +86,15 @@ The `MultiModalConversationalEngine` is a custom implementation that handles com
 ### Frontend Components
 - Chainlit for interactive interface
 - Dynamic base64 encoded image rendering
+
+### Deployment strategies and optimization
+- Docling and Instructor embeddings are CPU and cuda enabled python libraries. If provided with cuda enabled ec2 instances, the document processing and document indexing latency is cut down to half the time processing required for CPU document processing
+- Cuda enabled Dockerfile, enhancing faster usability with cuda enabled instances
+- Saving data basis new session / tab opened in a new folder for easier chat history and document indexing pipelines
+- Dockerfile consists a test-case for unit testing the FAST Api hit in /query with a unit-test dcoument and test query.
+- This ensures unit-testing as well as pre-loading the neccesary inference model files, which makes it ready for new document processing once chainlit frontend is activated.  
+
+### 
 
 ## 🚀 Installation
 

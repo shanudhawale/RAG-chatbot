@@ -42,6 +42,11 @@ from llama_index.core.evaluation import RelevancyEvaluator
 import nest_asyncio
 nest_asyncio.apply()
 
+import mlflow
+mlflow.llama_index.autolog()
+mlflow.set_experiment("llama-index-pdf-qa-rag")
+# mlflow.set_tracking_uri("http://0.0.0.0:5000")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 app = FastAPI(title="RAG API")
