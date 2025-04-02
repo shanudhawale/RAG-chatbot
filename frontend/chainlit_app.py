@@ -11,7 +11,6 @@ import uuid
 import os
 from pathlib import Path
 import httpx
-# from appv4 import initialize_index, process_documents
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,6 +52,11 @@ async def process_query(query: str, user_id: str, input_files: list , collection
 
 @cl.on_chat_start
 async def start():
+    """
+    On chat start, generate a unique user ID and send a welcome message.
+    The welcome message is sent one word at a time, with a short delay between
+    each word, to create a typing effect.
+    """
     user_id = f"user_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())}"
     cl.user_session.set("user_id", user_id)
     current_chunk = ""
@@ -69,6 +73,26 @@ async def start():
 
 @cl.on_message
 async def main(message: cl.Message):
+    """
+    Process a user message by handling uploaded documents and generating a response.
+
+    This function is triggered when a message is received. It checks for any 
+    attached document files, processes them, and generates a response based on 
+    the user's query. The response includes text and may include images sourced 
+    from the documents. If no documents are attached, it uses documents from the 
+    current session's collection.
+
+    The function streams a welcome message with a typing effect and then processes 
+    the uploaded documents or retrieves them from a session. It sets up a folder for 
+    image storage, updates the user session, and communicates with a processing 
+    query function to handle the user's query. The response, including any source 
+    nodes and images, is then sent back to the user.
+
+    :param message: The message object containing the user's query and any attached 
+                    document files.
+    :type message: cl.Message
+    """
+
     user_id = cl.user_session.get("user_id")
     msg1 = cl.Message(content="")
 

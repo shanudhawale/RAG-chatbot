@@ -1,10 +1,10 @@
 # PDF RAG Chatbot
 
-A sophisticated PDF chatbot leveraging Retrieval-Augmented Generation (RAG) with multimodal capabilities, enabling intelligent conversations about both textual and visual content from PDF documents.
+A sophisticated LLM chatbot leveraging Retrieval-Augmented Generation (RAG) with multimodal capabilities, enabling intelligent conversations about both textual and visual content from documents with .pdf, .docx, .xlsx documents.
 
 ## Features
 
-- **Advanced RAG Implementation**: Custom multimodal RAG system using LlamaIndex + Docling + Instructor Embeddings + ChromaDB + GPT-4o + LLM evaluation + Guardrails via Custom Prompt
+- **Advanced RAG Implementation**: Custom multimodal RAG system using LlamaIndex + Docling + Instructor Embeddings + ChromaDB + GPT-4o + LLM evaluation + LLM Summarizer for chat history
 - **PDF Processing**: Intelligent handling of PDFs including text and images
 - **Text Document Processing**: Handling .docx documents to markdowns
 - **XLSX Document Processing**: Handling .xlsx documents to markdowns
@@ -23,13 +23,13 @@ The system implements a RAG architecture with the following components:
 1. **Document Processing**
    - Processes PDFs to extract both text as markdowns using Docling for .pdf, .docx and .xlsx dcouments
    - Processes documents to extract images using Docling's default OCR Easy-OCR
-   - Maintains spatial relationships and document structure
+   - Maintains spatial relationships and document structure converting it into **markdown**
    - Creates separate nodes for text and image content and create a metadata rich document for pdf
 
 2. **Embedding System**
    - Uses Instructor Embeddings from Hugging Face "hkunlp/instructor-base" for semantic understanding
-   - Custom instruction tuning for financial document context by using a custom prompt specifying the context of the document
-   - Batch processing capability for efficient embedding generation
+   - Custom instruction tuning for document context by using a custom prompt specifying the context of the document
+   - Excel files usually contain structured data — not raw text — and the summary index helps turn those structured rows/columns into meaningful context chunks that can be queried effectively.
 
 3. **Vector Storage**
    - ChromaDB as the vector store and the indexes are created using the Instructor Embeddings
@@ -40,11 +40,12 @@ The system implements a RAG architecture with the following components:
 4. **Retrieval System**
    - Top-k similarity search for relevant content using ChromaDB indexes
    - Hybrid retrieval combining text and image nodes
-   - Context-aware document fetching and passing the context to the LLM for response generation via guardrails included in the QA Custom Prompt
+   - Context-aware document fetching and passing the context to the LLM for response generation strict to JSON included in the QA Custom Prompt
 
 5. **LLM Evaluation**
-   - Documents retrived from the user query is evaluated using RelevancyEvaluator
-   - The documents retrived and the final response provided by the LLM is evaluated using FaithfulnessEvaluator to check if the LLM didn't hallucinate and provided answers around the documents retrived from VectorIndex.
+   - Documents retrieved from the user query is evaluated using RelevancyEvaluator with callback of passing and score
+   - The score is being passed basis the evaluation with 1 being the highest and 5 being the lowest
+   - The documents retrieved and the final response provided by the LLM is evaluated using FaithfulnessEvaluator to check if the LLM didn't hallucinate and provided answers around the documents retrived from VectorIndex.
 
 ### Multimodal Conversational Query Engine
 
@@ -63,8 +64,8 @@ The `MultiModalConversationalEngine` is a custom implementation that handles com
    - Maintains image metadata and relationships
 
 3. **Context Management**
-   - Chat history integration
-   - Source document tracking
+   - Chat history integration by introducing summaraizer through Open AI LLM to summuaraze past chats each session
+   - Source document tracking for every session created
    - Response formatting and structuring
 
 4. **Response Generation**
@@ -76,9 +77,9 @@ The `MultiModalConversationalEngine` is a custom implementation that handles com
 
 ### Backend Components
 - FastAPI for API endpoints
-- LlamaIndex for RAG implementation
-- ChromaDB for vector storage + Instructor-base Embeddings 
-- LLM evaluation using LlamaIndex using RelevancyEvaluator, FaithfulnessEvaluator
+- LlamaIndex framework for RAG implementation
+- ChromaDB for vector storage + Instructor-base Embeddings for PDF/DOCX + SummaryIndex for XLSX documents 
+- LLM evaluation via LlamaIndex using RelevancyEvaluator, FaithfulnessEvaluator
 
 ### Frontend Components
 - Chainlit for interactive interface
@@ -123,28 +124,29 @@ chainlit run app.py --port 8000 --host 0.0.0.0
 uvicorn appv2:app --reload --port 8001 --host 0.0.0.0
 ```
 
-8. Run the application by Docker
-- Build the Docker Image 
+### Local/Cloud Setup for easy reproduciblity 
+Please ensure git, docker and docker-compose is installed Run the application by Docker
+1. Build the Docker Image 
 ```bash
 docker build -t pdf-rag:v1 .
 ```
 
-- Run the Dockerfile
+2. Run the Dockerfile
 ```bash
 docker run --gpus all --name chainlit-rag -p 8000:8000 -p 8001:8001 -e OPENAI_API_KEY=<your_api_key_here > -e LLAMA_CLOUD_API_KEY=<your_api_key_here > -e DOCLING_ARTIFACTS_PATH=/root/.cache/docling/models -v "$(pwd)/backend/chroma_db2/:/app/backend/chroma_db2/" -v "$(pwd)/backend/data_images/:/app/backend/data_images/" pdf-rag:v1
 ```
 
-- You can also run the Docker-compose file:
+3. You can also run the Docker-compose file:
 ```bash
 docker-compose up -d
 ```
 
-- To close the docker compose
+4. To close the docker compose
 ```bash
 docker-compose down
 ```
 
-- To get all the logs 
+5. To get all the logs 
 ```bash
 docker-compose logs -f chainlit-rag
 ```

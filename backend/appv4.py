@@ -1,3 +1,4 @@
+# importing libraries
 import logging
 from fastapi import FastAPI, HTTPException, File
 from fastapi.responses import StreamingResponse
@@ -40,12 +41,6 @@ from llama_index.core.evaluation import FaithfulnessEvaluator
 from llama_index.core.evaluation import RelevancyEvaluator
 import nest_asyncio
 nest_asyncio.apply()
-# from langsmith import Client, traceable
-# from langsmith.run_trees import RunTree
-
-# os.environ["LANGSMITH_TRACING"] = "true" 
-# os.environ["LANGSMITH_ENDPOINT"] = "https://eu.api.smith.langchain.com"
-# os.environ["LANGSMITH_PROJECT"] = "rag-pdf-chat"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -59,14 +54,15 @@ Settings.llm = llm
 summarizer_llm = llm
 tokenizer_fn = tiktoken.encoding_for_model("gpt-4-0125-preview").encode
 
-# Evaluation
+# Evaluation Criteria inbuilt from llama-index
 relavancy_evaluator = RelevancyEvaluator(llm=llm)
 faithfull_evaluator = FaithfulnessEvaluator(llm=llm)
 
+# Initialize ChromaDB
 CHROMA_DB_PATH = "/app/backend/chroma_db2"
 os.makedirs(CHROMA_DB_PATH, exist_ok=True)
 
-class QueryRequest(BaseModel):   
+class QueryRequest(BaseModel):
     query: str = Field(..., description="User query")
     data_path: Optional[str] = Field(default="data", description="Path to document directory")
     user_id: str = Field(..., description="Unique user identifier")
@@ -81,16 +77,15 @@ class ChatMessage(BaseModel):
 
 # Initialize global variables
 index_cache: Dict[str, VectorStoreIndex] = {}
-# chat_history: Dict[str, List[ChatMessage]] = {}
 chat_history: Dict[str, ChatSummaryMemoryBuffer] = {}
 
 
 pdf_pipeline_options = PdfPipelineOptions()
 pdf_pipeline_options.generate_page_images = True
-# pdf_pipeline_options.generate_picture_images = True
 
+# Docling Document Converter intialized
 doc_converter = (
-        DocumentConverter(  # all of the below is optional, has internal defaults.
+        DocumentConverter(  
             allowed_formats=[
                 InputFormat.PDF,
                 InputFormat.DOCX,
@@ -107,6 +102,7 @@ doc_converter = (
         )
     )
 
+# Instructor Embeddings
 class InstructorEmbeddings(BaseEmbedding):
     _model: INSTRUCTOR = PrivateAttr()
     _instruction: str = PrivateAttr()
@@ -117,6 +113,14 @@ class InstructorEmbeddings(BaseEmbedding):
         instruction: str = "Represent this document for semantic search across academic, report, and structured data formats around page numbers. If the content is from a research paper or presentation (PDF), focus on extracting key technical concepts, arguments, and any referenced figures or slides. If the content is from a DOCX file, capture the logical flow, section headings, and paragraph summaries relevant for understanding the main points and conclusions.",
         **kwargs: Any,
     ) -> None:
+        """
+        Initializes the InstructorEmbeddings class.
+
+        Args:
+            instructor_model_name (str): The name of the Instructor model to use. Defaults to "hkunlp/instructor-base".
+            instruction (str): The instruction to give to the Instructor model. Defaults to a string that asks the model to extract key technical concepts, arguments, and referenced figures or slides for PDFs and logical flow, section headings, and paragraph summaries for DOCX files.
+            **kwargs: Additional keyword arguments to pass to the BaseEmbedding constructor.
+        """
         super().__init__(**kwargs)
         self._model = INSTRUCTOR(instructor_model_name)
         self._instruction = instruction
@@ -145,10 +149,12 @@ class InstructorEmbeddings(BaseEmbedding):
         )
         return embeddings
 
+# Instantiate InstructorEmbeddings
 embed_model = InstructorEmbeddings(embed_batch_size=2)
 Settings.embed_model = embed_model
 Settings.chunk_size = 512
 
+# Initialize Persistent ChromaDB
 try:
     db = chromadb.PersistentClient(
         path=CHROMA_DB_PATH,
@@ -162,6 +168,7 @@ except Exception as e:
 
 current_index: Optional[VectorStoreIndex] = None
 
+# Initialize function to index for the process_query() function
 def initialize_index(doc_collection_name:str, docs, doc_type):
     """Initialize the index from ChromaDB"""
     global current_index
@@ -219,9 +226,18 @@ def initialize_index(doc_collection_name:str, docs, doc_type):
         logger.error(f"Error initializing index: {str(e)}")
         raise
 
-
 def process_documents(input_paths, output_dir):
     # print("Input files in document processing")
+    """
+    Process a list of input files and convert them to a list of Document objects
+
+    Args:
+        input_paths (list[tuple]): A list of tuples containing the input file path and the actual document name
+        output_dir (str): The output directory for the processed documents
+
+    Returns:
+        tuple[list[Document], str]: A tuple containing a list of Document objects and the document type
+    """
     docs = []
     inputfiles = [Path(ip[0]) for ip in input_paths]
     temp_file_names = [ip[0].split('/')[-1] for ip in input_paths]
@@ -263,7 +279,7 @@ def process_documents(input_paths, output_dir):
 
     return docs, document.metadata['document_type']
 
-
+# Define the prompt template that is passed on to the OPENAI LLM
 QA_PROMPT_TMPL = """\
 Below we give parsed text from slides in two different formats, as well as the image.
 
@@ -329,6 +345,14 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         memory_buffer: ChatSummaryMemoryBuffer = None,
         context_prompt: PromptTemplate = CONTEXT_PROMPT,
     ):
+        """Initialize the multimodal conversational RAG engine
+
+        Args:
+            retriever: The retriever to use for the engine
+            multi_modal_llm: The multimodal LLM to use for the engine
+            memory_buffer: The chat summary memory buffer to use for the engine
+            context_prompt: The prompt to use for the engine
+        """
         self._retriever = retriever
         self._llm = multi_modal_llm
         self._memory = memory_buffer or ChatSummaryMemoryBuffer.from_defaults(chat_history=chat_history,
@@ -339,7 +363,7 @@ class MultiModalConversationalEngine(CustomQueryEngine):
 
 
     def _create_image_documents(self, image_paths):
-        """Create image documents for the OpenAI multimodal model"""
+        """Create image documents for the given image paths to be displayed on the Chat UI"""
         image_documents = []
         #print("@@@@@@@@@",image_paths)
         for path in image_paths:
@@ -362,7 +386,7 @@ class MultiModalConversationalEngine(CustomQueryEngine):
 
     def process_response(self, response_text: str) -> Dict[str, Any]:
         """
-        Process and restructure the response to combine explanations
+        Process and restructure the response to combine explanations and references from the LLM response
         """
         try:
             cleaned_text = response_text.strip()
@@ -440,15 +464,8 @@ class MultiModalConversationalEngine(CustomQueryEngine):
             }
 
     def custom_query(self, query_str: str) -> Response:
-        """Process query with context and chat history"""
+        """Process query with context text and chat history and user querys that are based out of documnets and images"""
         
-        # run_tree = RunTree(
-        # name="Chat Pipeline",
-        # run_type="chain",
-        # inputs={"question": query_str}
-        # )
-                
-        # run_tree.post()
         # Get chat history
         try:
             chat_history = self._memory.get()
@@ -469,12 +486,6 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         context_chunks = []
         image_nodes = []
         
-        # child_history_retriveal_run = run_tree.create_child(
-        #     name="history",
-        #     run_type='retriever',
-        #     inputs={"history_context": chat_history_str_content,
-        #     "retrived_nodes":retrieved_nodes},
-        # )
         for node in retrieved_nodes:
             # Handle text content
             if isinstance(node, NodeWithScore):
@@ -493,17 +504,8 @@ class MultiModalConversationalEngine(CustomQueryEngine):
                 image_nodes.append(node)
         # Combine text context
         context_text = "\n\n".join(context_chunks)
-        # child_history_retriveal_run.end(outputs=context_chunks)
-        # child_history_retriveal_run.patch()
         print("Context Text:",context_text)
-        #chat_history = self._memory.get()
-        #print("!@#!!", chat_history)
-        #chat_history_str = "\n".join([
-        #    f"{msg.role}: {msg.content}"
-        #    for msg in chat_history
-        #])
         
-
         # Format prompt with context and history
         prompt = self._context_prompt.format(
             chat_history=chat_history_str_content,
@@ -547,19 +549,14 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         processed_response = self.process_response(final_response)
         final_response_str = str(processed_response["result_response"]["explanation"])
 
-        # eval_result = faithfull_evaluator.evaluate(response=final_response_str,
-        #                                            contexts=context_chunks)
-        # print("Faithfull eval result:",eval_result.passing, eval_result.score)
+        eval_result = faithfull_evaluator.evaluate(response=final_response_str,
+                                                   contexts=context_chunks)
+        print("Faithfull eval result:",eval_result.passing, eval_result.score)
 
-        # relevance_result = relavancy_evaluator.evaluate(query=query_str,
-        #                                                 response=final_response_str,
-        #                                                 contexts=context_chunks)
-        # print("Relevance Result:",relevance_result.passing, relevance_result.score)
-
-
-        # print("Final response before sending:", final_response_str)
-        # run_tree.end(outputs={"Response":final_response_str})
-        # run_tree.patch()
+        relevance_result = relavancy_evaluator.evaluate(query=query_str,
+                                                        response=final_response_str,
+                                                        contexts=context_chunks)
+        print("Relevance Result:",relevance_result.passing, relevance_result.score)
         
         # print(">>>>>>>>>",processed_response["refrence"])
         page_number_retrived = [str(processed_response["refrence"][i]["page_number"].split(' ')[-1]) for i in range(len(processed_response["refrence"]))]
@@ -604,6 +601,14 @@ class MultiModalConversationalEngine(CustomQueryEngine):
 
 
 def get_base64_image(image_path: str) -> str:
+    """Encode an image file at the given path as a base64 string.
+
+    Args:
+        image_path (str): The path to the image file.
+
+    Returns:
+        str: The base64 encoded string of the image data.
+    """
     try:
         image_path = image_path.replace("\\", "/")
         with open(image_path, "rb") as image_file:
@@ -614,7 +619,54 @@ def get_base64_image(image_path: str) -> str:
 
 @app.post("/query")
 async def query_documents(request: QueryRequest):
+    """
+    Process a query using the multimodal conversational engine.
+
+    Given a set of documents and a user query, this endpoint processes the query
+    using the multimodal conversational engine and returns the response as a
+    StreamingResponse.
+
+    The response is a JSON object with the following keys:
+
+    *   `response`: The response text from the GPT-4o model.
+    *   `source_nodes`: A list of dictionaries representing the source nodes
+        used to generate the response. Each dictionary contains the following
+        keys:
+
+        *   `text`: The text content of the source node.
+        *   `metadata`: A dictionary containing the metadata of the source
+            node, including:
+
+            *   `pdf_name`: The name of the PDF file containing the source
+                node.
+            *   `page_num`: The page number of the source node in the
+                original PDF file.
+            *   `actual_doc_name`: The name of the original PDF file that
+                the source node was extracted from.
+            *   `document_type`: The type of document that the source node
+                was extracted from (e.g. PDF, DOCX, XLSX).
+            *   `image_base64`: The base64 encoded image data of the source
+                node, if applicable.
+
+    :param request: The QueryRequest object containing the user query and
+        documents to process.
+    :return: A StreamingResponse object containing the response as a JSON
+        object.
+    """
     async def event_stream():
+        """
+        Asynchronously process a user query and document inputs, yielding status updates and the final result.
+
+        This generator function handles the processing of document inputs, initializes the index, and 
+        communicates with a multimodal conversational engine to generate a response. It yields status 
+        updates at various stages of processing and ultimately yields the final response as a JSON object.
+
+        Yields:
+            str: Status updates and the final response in the form of JSON-formatted strings.
+
+        Raises:
+            HTTPException: If there are no indexed documents or if any errors occur during processing.
+        """
         global doc_type
         try:
             # inputfiles = [Path(ip[0]) for ip in request.input_files]
@@ -686,8 +738,20 @@ async def query_documents(request: QueryRequest):
     
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
+# Get chat history for a specified user (personal use case)
 @app.get("/chat_history/{user_id}")
 async def get_chat_history(user_id: str):
+    """
+    Retrieve chat history for a specified user.
+
+    Args:
+        user_id (str): The unique identifier for the user whose chat history is to be retrieved.
+
+    Returns:
+        dict: A dictionary containing a list of chat messages for the specified user. If the user
+              does not have any chat history, an empty list is returned.
+    """
+
     if user_id not in chat_history:
         return {"messages": []}
     return {"messages": chat_history[user_id]}
