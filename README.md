@@ -60,7 +60,7 @@ The system implements a RAG architecture with the following components:
 
 3. **Vector Storage (backend/indexing.py)**
    - ChromaDB as the vector store and the indexes are created using the Instructor Embeddings
-   - SummaryIndex for xlsx documents and the indexes are created
+   - MarkdownNodeParser + LLM is used for xlsx documents and the indexes are created
    - Persistent storage for document embeddings
    - Efficient similarity search capabilities
 
@@ -112,7 +112,7 @@ The `MultiModalConversationalEngine` is a custom implementation that handles com
 ### Backend Components
 - FastAPI for API endpoints
 - LlamaIndex framework for RAG implementation
-- ChromaDB for vector storage + Instructor-base Embeddings for PDF/DOCX + SummaryIndex for XLSX documents 
+- ChromaDB for vector storage + Instructor-base Embeddings for PDF/DOCX/XLSX documents 
 - LLM evaluation via MLflow using Relevancy Evaluator, Faithfulness Evaluator and Latency
 
 ### Frontend Components
