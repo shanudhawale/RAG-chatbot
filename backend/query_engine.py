@@ -79,6 +79,27 @@ Given below is XML that describes the information to extract from this document 
     </list>
 </output>
 
+This example can help you understand the output format.
+```json
+{
+    "result_respnse": [
+        {
+            "explanation1": "The document discusses the process of annotating scientific articles, focusing on the methodology used to ensure clarity and specificity in labeling.",
+            "explanation2": "It details the phases of data selection and preparation, emphasizing the importance of having a diverse and well-prepared dataset for effective annotation.",
+            "explanation3": "The document outlines the roles of different teams involved in the annotation process, including a small team of experts and a larger group of dedicated annotators.",
+            "explanation4": "It also highlights the challenges faced in distinguishing between documents and the criteria used to ensure that all documents are free to use."
+        }
+    ],
+    "refrence": [
+        {
+            "page_number": "9",
+            "pdf_name": "2408.09869v5.pdf",
+            "actual_doc_name": "2408.09869v5.pdf",
+            "doc_type": "pdf"
+        }
+    ]
+}
+```
 ONLY return a valid JSON object (no other text is necessary). The JSON MUST conform to the XML format, including any types and format requests e.g. requests for lists, objects and specific types. Be correct and concise.
 """
 

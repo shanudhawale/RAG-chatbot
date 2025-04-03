@@ -23,7 +23,7 @@ class QueryRequest(BaseModel):
 # Initialize FastAPI app
 app = FastAPI(title="RAG API")
 
-gpt_4v = OpenAIMultiModal(model="gpt-4o-mini",
+gpt_4v = OpenAIMultiModal(model="gpt-4o",
                           api_key=os.getenv("OPENAI_API_KEY"),max_new_tokens=4096)
 
 # Create custom query engine
@@ -129,7 +129,7 @@ async def query_documents(request: QueryRequest):
             }
 
             yield f"event: final\ndata: {json.dumps(final_result, separators=(',', ':'))}\n\n"
-            logger.info(f"Response received from GPT-4o: {final_result}")
+            # logger.info(f"Response received from GPT-4o: {final_result}")
         except Exception as e:
             logger.error(f"Error processing query: {e}")
             raise HTTPException(status_code=500, detail=str(e))

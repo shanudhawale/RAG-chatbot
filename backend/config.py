@@ -53,9 +53,9 @@ Settings.chunk_size = 512
 
 
 # LLM initialization
-llm = OpenAI(model="gpt-4o-mini", api_key=os.getenv("OPENAI_API_KEY"))
+llm = OpenAI(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
 Settings.llm = llm
 
 # Summarizer and tokenizer for chat history
 summarizer_llm = llm
-tokenizer_fn = tiktoken.encoding_for_model("gpt-4o-mini").encode
+tokenizer_fn = tiktoken.encoding_for_model("gpt-4o").encode
