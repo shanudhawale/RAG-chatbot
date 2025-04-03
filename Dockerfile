@@ -48,7 +48,7 @@ RUN touch .env
 # Create entrypoint script
 RUN echo '#!/bin/bash\n\
 mkdir -p /app/backend/data_images/xyz-abc-qwerty/\n\
-uvicorn backend.appv4:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 500 --loop asyncio &\n\
+uvicorn backend.main:app --host 0.0.0.0 --port 8001 --timeout-keep-alive 500 --loop asyncio &\n\
 mlflow ui --host 0.0.0.0 --port 5000 &\n\
 echo "Waiting for backend to start..."\n\
 until curl -s http://localhost:8001/docs > /dev/null; do\n\
