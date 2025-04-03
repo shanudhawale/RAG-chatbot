@@ -18,20 +18,46 @@ A sophisticated LLM chatbot leveraging Retrieval-Augmented Generation (RAG) with
 ![Architecture](pdf-rag-chat.png)
 ### RAG Implementation Details
 
+### Project Structure
+/
+|--- .chainlit/
+|    |--- config.toml
+|--- app/
+|    |--- backend/
+|    |    |--- config.py                    # Embedding setup, memory, logging
+|    |    |--- document_processing.py       # File parsing and markdown generation
+|    |    |--- query_engine.py              # Custom multimodal query engine
+|    |    |--- embeddings.py                # Instructor Embeddings + Summary index for XLSX doc
+|    |    |--- indexing.py                  # Chroma index setup
+|    |    |--- chroma_db2/                  # Persistent Vector Index
+|    |    |--- data_iamges/                 # Folder storage for image files from pdf
+|    |    |--- main.py                      # FastAPI app with /query endpoint
+|    |--- frontend/
+|    |    |--- chainlit_app.py              # Chainlit frontend UI setup
+|    |    |--- chainlit.md
+|    |--- logs/
+|    |    |--- processing_logs.log          # Logging Info, warning and error files
+|--- requirements-new.txt
+|--- README.md
+|--- .env 
+|--- DockerFile
+|--- docker-compose.yaml
+
+
 The system implements a RAG architecture with the following components:
 
-1. **Document Processing**
+1. **Document Processing (backend/document_processing.py)**
    - Processes PDFs to extract both text as markdowns using Docling for .pdf, .docx and .xlsx dcouments
    - Processes documents to extract images using Docling's default OCR Easy-OCR
    - Maintains spatial relationships and document structure converting it into **markdown**
    - Creates separate nodes for text and image content and create a metadata rich document for pdf
 
-2. **Embedding System**
+2. **Embedding System (backend/embeddings.py)**
    - Uses Instructor Embeddings from Hugging Face "hkunlp/instructor-base" for semantic understanding
    - Custom instruction tuning for document context by using a custom prompt specifying the context of the document
    - Excel files usually contain structured data — not raw text — and the summary index helps turn those structured rows/columns into meaningful context chunks that can be queried effectively.
 
-3. **Vector Storage**
+3. **Vector Storage (backend/indexing.py)**
    - ChromaDB as the vector store and the indexes are created using the Instructor Embeddings
    - SummaryIndex for xlsx documents and the indexes are created
    - Persistent storage for document embeddings
@@ -43,13 +69,18 @@ The system implements a RAG architecture with the following components:
    - Context-aware document fetching and passing the context to the LLM for response generation strict to JSON included in the QA Custom Prompt
 
 5. **LLM Evaluation**
-   - Documents retrieved from the user query is evaluated using LlamaIndex's RelevancyEvaluator with callback of passing and score
-   - The documents retrieved and the final response provided by the LLM is evaluated using LlamaIndex's FaithfulnessEvaluator to check if the LLM didn't hallucinate and provided answers around the documents retrived from VectorIndex.
-   - The score is being passed basis the evaluation with 1 being the highest and 5 being the lowest
-   - Integrating LlamaIndex with MLFlow for tracing the experiments to gather insights on latency metrics under the project-name: 
-   *llama-index-pdf-qa-rag* under the traces tab
+   - Documents retrieved from the user query is evaluated using Mlflow's RelevancyEvaluator with callback of passing and score
+   - The documents retrieved and the final response provided by the LLM is evaluated using Mlflow's Faithfulness Evaluator to check if the LLM didn't hallucinate and provided answers around the documents retrived from VectorIndex.
+   - The score is being passed basis the evaluation with 1 being the lowest and 5 being the highest
+   - Integrating Mlflow for tracing the experiments to gather insights on latency metrics under the project-name: 
+   *llama-index-pdf-qa-rag* under the traces tab and evaluation metrics under the evaluation tab
+   - The Mlflow UI can we viewed at : http://localhost:5000
 
-### Multimodal Conversational Query Engine
+6. **Fast API server**
+   - Fast RAG API provides real-time streaming responses, allowing users to receive step-by-step status updates via StreamingResponse
+   - /query endpoint is utilized by the Chainlit application for Document information retrieval
+
+### Multimodal Conversational Query Engine (backend/query_engine.py)
 
 The `MultiModalConversationalEngine` is a custom implementation that handles complex multimodal interactions:
 
@@ -81,7 +112,7 @@ The `MultiModalConversationalEngine` is a custom implementation that handles com
 - FastAPI for API endpoints
 - LlamaIndex framework for RAG implementation
 - ChromaDB for vector storage + Instructor-base Embeddings for PDF/DOCX + SummaryIndex for XLSX documents 
-- LLM evaluation via LlamaIndex using RelevancyEvaluator, FaithfulnessEvaluator
+- LLM evaluation via MLflow using Relevancy Evaluator, Faithfulness Evaluator and Latency
 
 ### Frontend Components
 - Chainlit for interactive interface
@@ -91,7 +122,7 @@ The `MultiModalConversationalEngine` is a custom implementation that handles com
 - Docling and Instructor embeddings are CPU and cuda enabled python libraries. If provided with cuda enabled ec2 instances, the document processing and document indexing latency is cut down to half the time processing required for CPU document processing
 - Cuda enabled Dockerfile, enhancing faster usability with cuda enabled instances
 - Saving data basis new session / tab opened in a new folder for easier chat history and document indexing pipelines
-- Dockerfile consists a test-case for unit testing the FAST Api hit in /query with a unit-test dcoument and test query.
+- Dockerfile consists a test-case for unit testing the Fast API hit in /query with a unit-test dcoument and test query.
 - This ensures unit-testing as well as pre-loading the neccesary inference model files, which makes it ready for new document processing once chainlit frontend is activated.  
 
 ### 

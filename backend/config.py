@@ -14,7 +14,7 @@ from llama_index.core import Settings
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, handlers=[
-        logging.FileHandler("processing_logs.log"),
+        logging.FileHandler("logs/processing_logs.log"),
         logging.StreamHandler()
     ])
 logger = logging.getLogger(__name__)

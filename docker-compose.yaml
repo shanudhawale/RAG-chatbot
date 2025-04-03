@@ -15,6 +15,7 @@ services:
     volumes:
       - ${PROJECT_PATH}/backend/chroma_db2/:/app/backend/chroma_db2/
       - ${PROJECT_PATH}/backend/data_images/:/app/backend/data_images/
+      - ${PROJECT_PATH}/logs/:/app/logs/
     restart: always
     deploy:
      resources:

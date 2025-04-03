@@ -23,6 +23,12 @@ class QueryRequest(BaseModel):
 # Initialize FastAPI app
 app = FastAPI(title="RAG API")
 
+gpt_4v = OpenAIMultiModal(model="gpt-4o-mini",
+                          api_key=os.getenv("OPENAI_API_KEY"),max_new_tokens=4096)
+
+# Create custom query engine
+query_engine = MultiModalConversationalEngine()
+
 @app.post("/query")
 async def query_documents(request: QueryRequest):
     """
@@ -72,12 +78,14 @@ async def query_documents(request: QueryRequest):
             yield "event: status\ndata: Processing documents...\n\n"
             if request.input_files != []:
                 docs, doc_type = process_documents(request.input_files, request.collection)
+                logger.info(f"Processed documents with input paths: {request.input_files} and output dir: {request.collection}")
                 # print("<<<<<<<<<", docs, doc_type)
             else:
                 docs = []
             
             yield "event: status\ndata:  Initializing index...\n\n"
             current_index = initialize_index(request.collection,docs, doc_type)
+            logger.info(f"Initialized index for collection: {request.collection}")
             if current_index is None:
                 raise HTTPException(
                     status_code=400,
@@ -87,27 +95,19 @@ async def query_documents(request: QueryRequest):
             # Initialize multimodal LLM
             
             yield "event: status\ndata: Processing documents using GPT-4o...\n\n"
-            gpt_4v = OpenAIMultiModal(
-                model="gpt-4o-mini",
-                api_key=os.getenv("OPENAI_API_KEY"),
-                max_new_tokens=4096
-            )
-            
             # Initialize memory buffer
             memory_key = f"memory_{request.user_id}"
             if memory_key not in chat_history:
+                logger.info(f"Initializing memory buffer for user: {request.user_id}")
                 chat_history[memory_key] = ChatSummaryMemoryBuffer.from_defaults(llm=summarizer_llm,
                                                                                 token_limit=2,
                                                                                 tokenizer_fn=tokenizer_fn,)
-            
-            # Create custom query engine
-            query_engine = MultiModalConversationalEngine()
+                
             query_engine.intialize_engine(
                 retriever=current_index.as_retriever(similarity_top_k=6),
                 multi_modal_llm=gpt_4v,
                 memory_buffer=chat_history[memory_key]
-            )
-            
+            )            
             # Get response
             response = query_engine.custom_query(request.query)
             yield "event: status\ndata: Response received from GPT-4o...\n\n"
@@ -129,30 +129,12 @@ async def query_documents(request: QueryRequest):
             }
 
             yield f"event: final\ndata: {json.dumps(final_result, separators=(',', ':'))}\n\n"
+            logger.info(f"Response received from GPT-4o: {final_result}")
         except Exception as e:
             logger.error(f"Error processing query: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     
     return StreamingResponse(event_stream(), media_type="text/event-stream")
-
-# Get chat history for a specified user (personal use case)
-@app.get("/chat_history/{user_id}")
-async def get_chat_history(user_id: str):
-    """
-    Retrieve chat history for a specified user.
-
-    Args:
-        user_id (str): The unique identifier for the user whose chat history is to be retrieved.
-
-    Returns:
-        dict: A dictionary containing a list of chat messages for the specified user. If the user
-              does not have any chat history, an empty list is returned.
-    """
-
-    if user_id not in chat_history:
-        return {"messages": []}
-    return {"messages": chat_history[user_id]}
-
 
 if __name__ == "__main__":
     import uvicorn

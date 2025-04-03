@@ -315,7 +315,7 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         )
         
         final_response = str(text_response)
-        print("Final response::",final_response)
+        logger.info(f"Final Response: {final_response}")
         # Process and restructure the response
         processed_response = self.process_response(final_response)
         final_response_str = str(processed_response["result_response"]["explanation"])
@@ -329,6 +329,7 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         #                                                 contexts=context_chunks)
         # print("Relevance Result:",relevance_result.passing, relevance_result.score)
         try:
+            logger.info("Logging the experiment to MLflow...")
             eval_data = pd.DataFrame({
                 "inputs": [query_str],
                 "context": [context_chunks],
@@ -345,7 +346,6 @@ class MultiModalConversationalEngine(CustomQueryEngine):
                     extra_metrics=[faithfulness(model="openai:/gpt-4o-mini"), relevance(model="openai:/gpt-4o-mini"), latency()],
                     evaluators="default",
                 )
-            print(">>>>>>",results)
         finally:
             mlflow.end_run()
 
@@ -360,12 +360,14 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         self._memory.put(ChatMessage(role="assistant",content=f"{final_response_str}", timestamp=datetime.now()))
 
         if document_type == []:
+            logger.warning("No valid documents found in the retrieved nodes")
             return Response("Can you ask a specific question to which document are you referring to", source_nodes=[])
         
         # Process source nodes and include base64 images
         seen_nodes = set()
         source_nodes_with_images = []
         # print("@@@@@",retrieved_nodes)
+        logger.info(f"Retrieved nodes: {retrieved_nodes}")
         for node in retrieved_nodes:
             if isinstance(node, NodeWithScore):
                 # Get the unique identifier tuple

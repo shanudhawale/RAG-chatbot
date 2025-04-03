@@ -40,6 +40,7 @@ ENV OMP_NUM_THREADS=4
 COPY .chainlit/config.toml ./.chainlit/config.toml
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
+COPY logs/ ./logs/
 COPY frontend/chainlit.md  ./frontend/chainlit.md
  
 # Create .env file placeholder
