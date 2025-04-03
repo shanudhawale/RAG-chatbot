@@ -7,10 +7,12 @@ import nest_asyncio
 from dotenv import load_dotenv
 from typing import Optional, List, Dict, Any
 from llama_index.core import VectorStoreIndex
+from llama_index.core import SummaryIndex
 from llama_index.core.memory import ChatSummaryMemoryBuffer
 from llama_index.llms.openai import OpenAI
 from backend.embeddings import InstructorEmbeddings
 from llama_index.core import Settings
+from llama_index.core.node_parser import MarkdownElementNodeParser
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO, handlers=[
@@ -29,6 +31,7 @@ load_dotenv()
 index_cache: Dict[str, VectorStoreIndex] = {}
 chat_history: Dict[str, ChatSummaryMemoryBuffer] = {}
 current_index: VectorStoreIndex = None
+# current_summary_index: SummaryIndex = None
 
 # Initialize ChromaDB
 CHROMA_DB_PATH = "/app/backend/chroma_db2"
@@ -56,6 +59,10 @@ Settings.chunk_size = 512
 llm = OpenAI(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))
 Settings.llm = llm
 
+o1_llm = OpenAI(model="o1-mini", api_key=os.getenv("OPENAI_API_KEY"))
+
 # Summarizer and tokenizer for chat history
 summarizer_llm = llm
 tokenizer_fn = tiktoken.encoding_for_model("gpt-4o").encode
+
+node_parser = MarkdownElementNodeParser(llm=llm)

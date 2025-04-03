@@ -62,7 +62,7 @@ async def start():
     current_chunk = ""
     msg =cl.Message(content="")
     token_list = "Welcome! I'm ready to answer questions about your documents. Please upload your documents before asking questions. " \
-    "You can add one or more than one documents for your use case. This chatbot accepts pdf, docx and xlsx documents"
+    "This chatbot accepts pdf, docx and xlsx documents"
 
     for token in token_list.split(' '):
         current_chunk = token + " "

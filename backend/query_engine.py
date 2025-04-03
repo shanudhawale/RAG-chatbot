@@ -388,7 +388,7 @@ class MultiModalConversationalEngine(CustomQueryEngine):
         seen_nodes = set()
         source_nodes_with_images = []
         # print("@@@@@",retrieved_nodes)
-        logger.info(f"Retrieved nodes: {retrieved_nodes}")
+        # logger.info(f"Retrieved nodes: {retrieved_nodes}")
         for node in retrieved_nodes:
             if isinstance(node, NodeWithScore):
                 # Get the unique identifier tuple

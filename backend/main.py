@@ -86,13 +86,13 @@ async def query_documents(request: QueryRequest):
             yield "event: status\ndata:  Initializing index...\n\n"
             current_index = initialize_index(request.collection,docs, doc_type)
             logger.info(f"Initialized index for collection: {request.collection}")
+            
             if current_index is None:
                 raise HTTPException(
                     status_code=400,
                     detail="No indexed documents found. Please index documents first."
                 )
             
-            # Initialize multimodal LLM
             
             yield "event: status\ndata: Processing documents using GPT-4o...\n\n"
             # Initialize memory buffer
