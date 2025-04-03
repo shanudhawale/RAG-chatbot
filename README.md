@@ -16,10 +16,8 @@ A sophisticated LLM chatbot leveraging Retrieval-Augmented Generation (RAG) with
 
 ## Technical Architecture
 ![Architecture](pdf-rag-chat.png)
-### RAG Implementation Details
 
-### Project Structure
-# Project Structure
+## Project Structure
 
 ```
 /
@@ -46,7 +44,7 @@ A sophisticated LLM chatbot leveraging Retrieval-Augmented Generation (RAG) with
 |--- DockerFile
 |--- docker-compose.yaml
 ```
-
+## RAG Implementation Details
 The system implements a RAG architecture with the following components:
 
 1. **Document Processing (backend/document_processing.py)**
@@ -128,8 +126,6 @@ The `MultiModalConversationalEngine` is a custom implementation that handles com
 - Dockerfile consists a test-case for unit testing the Fast API hit in /query with a unit-test dcoument and test query.
 - This ensures unit-testing as well as pre-loading the neccesary inference model files, which makes it ready for new document processing once chainlit frontend is activated.  
 
-### 
-
 ## 🚀 Installation
 
 ### Local Setup
@@ -169,7 +165,7 @@ chainlit run app.py --port 8000 --host 0.0.0.0
 uvicorn appv2:app --reload --port 8001 --host 0.0.0.0
 ```
 
-### Local/Cloud Setup for easy reproduciblity 
+## Local/Cloud Setup for easy reproduciblity 
 Please ensure git, docker and docker-compose is installed Run the application by Docker
 1. Build the Docker Image 
 ```bash
