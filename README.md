@@ -1,4 +1,4 @@
-# PDF RAG Chatbot
+# Converstional PDF/DOCX/XLSX RAG Chatbot
 
 A sophisticated LLM chatbot leveraging Retrieval-Augmented Generation (RAG) with multimodal capabilities, enabling intelligent conversations about both textual and visual content from documents with .pdf, .docx, .xlsx documents.
 
