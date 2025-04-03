@@ -19,6 +19,9 @@ A sophisticated LLM chatbot leveraging Retrieval-Augmented Generation (RAG) with
 ### RAG Implementation Details
 
 ### Project Structure
+# Project Structure
+
+```
 /
 |--- .chainlit/
 |    |--- config.toml
@@ -42,7 +45,7 @@ A sophisticated LLM chatbot leveraging Retrieval-Augmented Generation (RAG) with
 |--- .env 
 |--- DockerFile
 |--- docker-compose.yaml
-
+```
 
 The system implements a RAG architecture with the following components:
 
